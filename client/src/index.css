@@ -1,0 +1,104 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-heading: "Outfit", var(--font-sans);
+
+  /* Deep slate/sapphire base colors for brand identity */
+  --color-brand-50: #f4f6fc;
+  --color-brand-100: #e9ecf8;
+  --color-brand-200: #d6ddf3;
+  --color-brand-300: #b8c6ea;
+  --color-brand-400: #93a6de;
+  --color-brand-500: #637fcd;
+  --color-brand-600: #4d64bd;
+  --color-brand-700: #3f50a9;
+  --color-brand-800: #36428d;
+  --color-brand-900: #2f3871;
+  --color-brand-950: #1d2146;
+
+  /* Fresh emerald accent for active indicators, tables, success */
+  --color-accent-50: #f0fdf4;
+  --color-accent-100: #dcfce7;
+  --color-accent-200: #bbf7d0;
+  --color-accent-300: #86efac;
+  --color-accent-400: #4ade80;
+  --color-accent-500: #22c55e;
+  --color-accent-600: #16a34a;
+  --color-accent-700: #15803d;
+  --color-accent-800: #166534;
+  --color-accent-900: #14532d;
+  --color-accent-950: #052e16;
+
+  /* Premium neutral shades for clean layouts & dark mode */
+  --color-dark-50: #f8fafc;
+  --color-dark-100: #f1f5f9;
+  --color-dark-150: #e9eff5;
+  --color-dark-200: #e2e8f0;
+  --color-dark-300: #cbd5e1;
+  --color-dark-350: #b0bdcc;
+  --color-dark-400: #94a3b8;
+  --color-dark-500: #64748b;
+  --color-dark-600: #475569;
+  --color-dark-700: #334155;
+  --color-dark-800: #1e293b;
+  --color-dark-850: #172033;
+  --color-dark-900: #0f172a;
+  --color-dark-950: #030712;
+}
+
+@layer base {
+  * {
+    @apply border-dark-200 dark:border-dark-800;
+  }
+  
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    @apply antialiased text-dark-800 bg-dark-50 dark:text-dark-100 dark:bg-dark-950 font-sans transition-colors duration-200 scroll-smooth;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading text-dark-900 dark:text-white font-semibold;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-300 dark:bg-dark-700 rounded-full transition-colors hover:bg-dark-400 dark:hover:bg-dark-600;
+  }
+}
+
+/* Custom premium styles */
+.glass {
+  @apply bg-white/70 dark:bg-dark-900/70 backdrop-blur-md border border-white/20 dark:border-dark-800/40;
+}
+
+.text-gradient {
+  @apply bg-clip-text text-transparent bg-gradient-to-r from-brand-600 to-accent-500 dark:from-brand-400 dark:to-accent-400;
+}
+
+.bg-grid-pattern {
+  background-size: 40px 40px;
+  background-image: 
+    linear-gradient(to right, rgba(99, 127, 205, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 127, 205, 0.05) 1px, transparent 1px);
+}
+
+.dark .bg-grid-pattern {
+  background-image: 
+    linear-gradient(to right, rgba(99, 127, 205, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 127, 205, 0.03) 1px, transparent 1px);
+}
