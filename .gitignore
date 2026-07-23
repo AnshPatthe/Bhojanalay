@@ -17,6 +17,16 @@ out/
 *.tgz
 *.tar.gz
 
+# Uploaded Menu Assets (Exclude from git, preserve folder structure)
+server/assets/menu_items/*
+!server/assets/menu_items/.gitkeep
+
+# Database Files
+*.sqlite
+*.db
+*.db-journal
+*.sqlite3
+
 # Logs
 logs
 *.log

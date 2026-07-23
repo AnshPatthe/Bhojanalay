@@ -126,15 +126,15 @@ export const getMe = catchAsync(async (req, res) => {
     },
     employee: req.employee
       ? {
-          id: req.employee._id,
-          restaurantId: req.employee.restaurantId?._id || req.employee.restaurantId,
-          restaurantName: req.employee.restaurantId?.name,
-          restaurantCurrency: req.employee.restaurantId?.currency || 'USD',
-          role: req.employee.roleId?.name,
-          permissions: req.employee.roleId?.permissions,
-          branchId: req.employee.branchId?._id || req.employee.branchId,
-          branchName: req.employee.branchId?.name || 'Main Branch'
-        }
+        id: req.employee._id,
+        restaurantId: req.employee.restaurantId?._id || req.employee.restaurantId,
+        restaurantName: req.employee.restaurantId?.name,
+        restaurantCurrency: req.employee.restaurantId?.currency || 'USD',
+        role: req.employee.roleId?.name,
+        permissions: req.employee.roleId?.permissions,
+        branchId: req.employee.branchId?._id || req.employee.branchId,
+        branchName: req.employee.branchId?.name || 'Main Branch'
+      }
       : null
   });
 });
