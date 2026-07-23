@@ -50,6 +50,14 @@ const orderItemSchema = new mongoose.Schema({
   notes: {
     type: String,
     trim: true
+  },
+  preparingAt: Date,
+  readyAt: Date,
+  cancellationReason: String,
+  station: {
+    type: String,
+    enum: ['Main Course', 'Tandoor', 'Chinese', 'Snacks', 'Beverages', 'Desserts', 'General'],
+    default: 'General'
   }
 }, {
   timestamps: true

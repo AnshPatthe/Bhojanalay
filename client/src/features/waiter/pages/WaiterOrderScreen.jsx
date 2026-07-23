@@ -333,12 +333,12 @@ export const WaiterOrderScreen = () => {
                     <h5 className="font-semibold pr-2 text-dark-900 dark:text-white">{item.name}</h5>
                     <span className="font-bold whitespace-nowrap text-dark-900 dark:text-white">{formatCurrency(item.subtotal, currencyCode)}</span>
                   </div>
-                  {['ready', 'served'].includes(item.status) ? (
+                  {['preparing', 'ready', 'served'].includes(item.status) ? (
                     <div className="flex items-center justify-between mt-4">
                       <span className="text-xs text-dark-500 dark:text-dark-400 font-medium">
                         Quantity: <span className="font-bold text-dark-800 dark:text-white">{item.quantity}</span>
                       </span>
-                      <Badge variant="success" className="capitalize font-bold text-[10px] py-0.5 px-2">
+                      <Badge variant={item.status === 'preparing' ? 'warning' : 'success'} className="capitalize font-bold text-[10px] py-0.5 px-2">
                         {item.status}
                       </Badge>
                     </div>

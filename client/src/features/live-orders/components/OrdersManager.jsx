@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent, Button, Badge, Drawer, Input,
 import { useAuthStore } from '@/store/useAuthStore';
 import { formatCurrency } from '@/utils/formatCurrency';
 import api from '@/api';
+import { Trash2 } from 'lucide-react';
 
 export const OrdersManager = ({ socket }) => {
   const { currentRestaurant } = useAuthStore();
@@ -12,6 +13,7 @@ export const OrdersManager = ({ socket }) => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('active'); // 'active' or 'completed'
   const [selectedOrderForPopup, setSelectedOrderForPopup] = useState(null);
+  const [editingOrderId, setEditingOrderId] = useState(null);
   
   // Completed/Cancelled Order filters state
   const [completedSearch, setCompletedSearch] = useState('');
@@ -302,6 +304,26 @@ export const OrdersManager = ({ socket }) => {
     }));
   };
 
+  const handleModifyOrder = (order) => {
+    setEditingOrderId(order._id || order.id);
+    setNewOrderForm({
+      tableNumber: order.tableNumber || '',
+      orderType: order.orderType || 'dine-in',
+      customerPhone: order.customerPhone || '',
+      customerName: order.customerName || '',
+      items: (order.items || []).map(item => ({
+        menuItemId: item.menuItemId?._id || item.menuItemId,
+        name: item.name,
+        price: item.price,
+        quantity: item.quantity,
+        isExisting: true,
+        status: item.status
+      }))
+    });
+    setSelectedOrderForPopup(null);
+    setIsNewOrderDrawerOpen(true);
+  };
+
   const submitOrder = async () => {
     if (newOrderForm.items.length === 0) {
       toast.error('Please add at least one menu item.');
@@ -313,8 +335,9 @@ export const OrdersManager = ({ socket }) => {
     }
     try {
       await api.post('/orders', newOrderForm);
-      toast.success('Order ticket registered!');
+      toast.success(editingOrderId ? 'Order updated successfully!' : 'Order ticket registered!');
       setIsNewOrderDrawerOpen(false);
+      setEditingOrderId(null);
       setNewOrderForm({
         tableNumber: tables[0]?.tableNumber || '',
         orderType: 'dine-in',
@@ -323,13 +346,13 @@ export const OrdersManager = ({ socket }) => {
         items: []
       });
     } catch (err) {
-      toast.error('Failed to create order ticket');
+      toast.error(err.response?.data?.message || 'Failed to submit order');
     }
   };
 
   // Filter orders
   const filteredOrders = orders.filter(o => {
-    const isActive = ['pending', 'preparing', 'ready'].includes(o.status);
+    const isActive = ['pending', 'preparing', 'ready', 'billing'].includes(o.status);
     if (activeTab === 'active') {
       return isActive;
     } else {
@@ -375,7 +398,17 @@ export const OrdersManager = ({ socket }) => {
           <h1 className="text-2xl sm:text-3xl font-bold font-heading mb-1 text-dark-900 dark:text-white">Orders Manager</h1>
           <p className="text-xs text-dark-500">Coordinate and track live orders under kitchen prep</p>
         </div>
-        <Button variant="primary" onClick={() => setIsNewOrderDrawerOpen(true)}>
+        <Button variant="primary" onClick={() => {
+          setEditingOrderId(null);
+          setNewOrderForm({
+            tableNumber: tables[0]?.tableNumber || '',
+            orderType: 'dine-in',
+            customerPhone: '',
+            customerName: '',
+            items: []
+          });
+          setIsNewOrderDrawerOpen(true);
+        }}>
           Place Ticket
         </Button>
       </div>
@@ -692,6 +725,15 @@ export const OrdersManager = ({ socket }) => {
                     Cancel Ticket
                   </Button>
                 )}
+                {['pending', 'preparing', 'ready'].includes(activePopupOrder.status) && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => handleModifyOrder(activePopupOrder)}
+                    className="flex-1 h-11 border border-dark-200 dark:border-dark-750"
+                  >
+                    Modify Order
+                  </Button>
+                )}
                 {['pending', 'preparing', 'ready', 'billing'].includes(activePopupOrder.status) && (
                   <Button
                     variant="primary"
@@ -720,11 +762,18 @@ export const OrdersManager = ({ socket }) => {
       </Drawer>
 
       {/* Place Mock Order Drawer */}
-      <Drawer isOpen={isNewOrderDrawerOpen} onClose={() => setIsNewOrderDrawerOpen(false)} title="Simulate Table Order">
+      <Drawer
+        isOpen={isNewOrderDrawerOpen}
+        onClose={() => {
+          setIsNewOrderDrawerOpen(false);
+          setEditingOrderId(null);
+        }}
+        title={editingOrderId ? "Modify Table Order" : "Simulate Table Order"}
+      >
         <div className="space-y-6 text-left">
           <div>
             <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Service Type</label>
-            <Select value={newOrderForm.orderType} onChange={e => handleOrderTypeChange(e.target.value)}>
+            <Select value={newOrderForm.orderType} onChange={e => handleOrderTypeChange(e.target.value)} disabled={!!editingOrderId}>
               <option value="dine-in">Dine-In</option>
               <option value="takeaway">Takeaway</option>
               <option value="delivery">Delivery</option>
@@ -735,11 +784,13 @@ export const OrdersManager = ({ socket }) => {
             <div>
               <div className="flex justify-between items-center mb-1">
                 <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block">Table Number</label>
-                <Button variant="ghost" size="sm" onClick={() => setIsAddTableDrawerOpen(true)} className="text-xs h-6 px-2">
-                  + Add Table
-                </Button>
+                {!editingOrderId && (
+                  <Button variant="ghost" size="sm" onClick={() => setIsAddTableDrawerOpen(true)} className="text-xs h-6 px-2">
+                    + Add Table
+                  </Button>
+                )}
               </div>
-              <Select value={newOrderForm.tableNumber} onChange={e => setNewOrderForm({ ...newOrderForm, tableNumber: e.target.value })}>
+              <Select value={newOrderForm.tableNumber} onChange={e => setNewOrderForm({ ...newOrderForm, tableNumber: e.target.value })} disabled={!!editingOrderId}>
                 <option value="">Select Table...</option>
                 {tables.map(t => (
                   <option key={t._id} value={t.tableNumber}>Table {t.tableNumber} ({t.capacity} pax)</option>
@@ -753,7 +804,7 @@ export const OrdersManager = ({ socket }) => {
             {menuItems.length === 0 ? (
               <p className="text-xs text-dark-400">Create Category & Menu Items in Menu Config panel first.</p>
             ) : (
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
                 {menuItems.map(item => (
                   <button
                     key={item._id}
@@ -773,19 +824,84 @@ export const OrdersManager = ({ socket }) => {
             {newOrderForm.items.length === 0 ? (
               <p className="text-xs text-dark-450 italic">No dishes selected yet.</p>
             ) : (
-              <ul className="space-y-1.5 max-h-32 overflow-y-auto">
-                {newOrderForm.items.map((item, idx) => (
-                  <li key={idx} className="flex justify-between text-xs py-1 border-b border-dark-100 dark:border-dark-850">
-                    <span>{item.quantity}x {item.name}</span>
-                    <span>{formatCurrency(item.price * item.quantity, currencyCode)}</span>
-                  </li>
-                ))}
+              <ul className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {newOrderForm.items.map((item, idx) => {
+                  const isModifiable = !item.isExisting || ['pending', 'preparing'].includes(item.status);
+                  return (
+                    <li key={idx} className="flex justify-between items-center text-xs py-1.5 border-b border-dark-100 dark:border-dark-850 last:border-0">
+                      <div className="flex-grow min-w-0 pr-2">
+                        <span className="font-semibold text-dark-800 dark:text-white truncate block">{item.name}</span>
+                        {item.status && (
+                          <span className="text-[10px] uppercase font-bold text-dark-400">
+                            {item.status}
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        {isModifiable ? (
+                          <div className="flex items-center gap-2 bg-dark-50 dark:bg-dark-800/80 px-2 py-0.5 rounded-lg border border-dark-150 dark:border-dark-750">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewOrderForm(prev => {
+                                  const updated = [...prev.items];
+                                  const newQty = Math.max(1, updated[idx].quantity - 1);
+                                  updated[idx] = { ...updated[idx], quantity: newQty };
+                                  return { ...prev, items: updated };
+                                });
+                              }}
+                              className="text-dark-500 hover:text-dark-700 dark:text-dark-400 dark:hover:text-dark-250 font-bold px-1"
+                            >
+                              -
+                            </button>
+                            <span className="font-bold w-4 text-center">{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setNewOrderForm(prev => {
+                                  const updated = [...prev.items];
+                                  updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + 1 };
+                                  return { ...prev, items: updated };
+                                });
+                              }}
+                              className="text-dark-500 hover:text-dark-700 dark:text-dark-400 dark:hover:text-dark-250 font-bold px-1"
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="font-bold text-dark-500 px-3">{item.quantity}x</span>
+                        )}
+                        
+                        <span className="font-bold text-dark-750 dark:text-dark-200 w-16 text-right">
+                          {formatCurrency(item.price * item.quantity, currencyCode)}
+                        </span>
+
+                        {isModifiable && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewOrderForm(prev => ({
+                                ...prev,
+                                items: prev.items.filter((_, i) => i !== idx)
+                              }));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 p-1"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
 
           <Button variant="primary" className="w-full" onClick={submitOrder} disabled={newOrderForm.items.length === 0}>
-            Submit Kitchen Ticket
+            {editingOrderId ? "Update Order Ticket" : "Submit Kitchen Ticket"}
           </Button>
         </div>
       </Drawer>

@@ -74,8 +74,8 @@ export const Hero = () => {
             </div>
           </div>
           <div className="p-4 bg-dark-100 dark:bg-dark-950/30">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="col-span-2 h-64 bg-white dark:bg-dark-900 rounded-xl p-6 border border-dark-150 dark:border-dark-800 text-left flex flex-col justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="col-span-1 md:col-span-2 h-64 bg-white dark:bg-dark-900 rounded-xl p-6 border border-dark-150 dark:border-dark-800 text-left flex flex-col justify-between">
                 <div className="flex justify-between items-center">
                   <div>
                     <h3 className="font-heading font-semibold text-lg">Sales Analysis Overview</h3>

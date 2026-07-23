@@ -163,10 +163,17 @@ export const Topbar = ({ socket, onMenuToggle }) => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-dark-900 border-b border-dark-200 dark:border-dark-850 z-40 px-6 flex items-center justify-between">
+    <header className="fixed top-0 left-0 right-0 h-16 bg-white dark:bg-dark-900 border-b border-dark-200 dark:border-dark-850 z-40 px-4 sm:px-6 flex items-center justify-between">
       {/* Brand Context */}
       <div className="flex items-center space-x-3">
-        <div className="h-8 w-8 rounded bg-brand-650 flex items-center justify-center">
+        <button
+          onClick={onMenuToggle}
+          className="p-2 rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 text-dark-500 hover:text-dark-900 dark:text-dark-400 dark:hover:text-white transition-colors cursor-pointer md:hidden focus:outline-none"
+          aria-label="Toggle mobile menu"
+        >
+          <Menu className="h-5 w-5" />
+        </button>
+        <div className="h-8 w-8 rounded bg-brand-650 flex items-center justify-center flex-shrink-0">
           <span className="font-heading text-sm font-bold text-white">
             {currentRestaurant?.name ? currentRestaurant.name.charAt(0).toUpperCase() : 'V'}
           </span>
@@ -195,6 +202,7 @@ export const Topbar = ({ socket, onMenuToggle }) => {
 
         {/* Notifications Icon with live alerts */}
         <Dropdown
+          className="w-80 max-w-[calc(100vw-2rem)] p-0 overflow-hidden shadow-xl border border-dark-200 dark:border-dark-800"
           trigger={
             <button className="p-2 rounded-lg hover:bg-dark-50 dark:hover:bg-dark-800 text-dark-500 hover:text-dark-900 dark:text-dark-400 dark:hover:text-white transition-colors relative cursor-pointer focus:outline-none">
               <Bell className="h-5 w-5" />
@@ -204,15 +212,15 @@ export const Topbar = ({ socket, onMenuToggle }) => {
             </button>
           }
         >
-          <div className="px-4 py-2 border-b border-dark-100 dark:border-dark-800 flex justify-between items-center w-80">
+          <div className="px-4 py-2.5 border-b border-dark-100 dark:border-dark-800 flex justify-between items-center w-full bg-dark-50/50 dark:bg-dark-850/50">
             <span className="text-sm font-semibold text-dark-900 dark:text-white">Notifications</span>
             {unreadCount > 0 && (
-              <button onClick={markAllAsRead} className="text-xs text-brand-650 hover:underline cursor-pointer">
+              <button onClick={markAllAsRead} className="text-xs text-brand-650 hover:underline cursor-pointer font-medium">
                 Mark all read
               </button>
             )}
           </div>
-          <div className="max-h-64 overflow-y-auto w-80">
+          <div className="max-h-64 overflow-y-auto w-full divide-y divide-dark-100 dark:divide-dark-800">
             {notifications.length === 0 ? (
               <div className="px-4 py-6 text-center text-xs text-dark-400">
                 No notifications yet
@@ -221,11 +229,11 @@ export const Topbar = ({ socket, onMenuToggle }) => {
               notifications.map(notif => (
                 <div
                   key={notif.id}
-                  className={`px-4 py-3 border-b border-dark-100 dark:border-dark-800 text-left text-xs ${
-                    notif.isUnread ? 'bg-brand-50/20 dark:bg-brand-950/10' : ''
+                  className={`px-4 py-3 text-left text-xs transition-colors ${
+                    notif.isUnread ? 'bg-brand-50/30 dark:bg-brand-950/20' : 'hover:bg-dark-50/50 dark:hover:bg-dark-800/50'
                   }`}
                 >
-                  <p className="font-medium text-dark-850 dark:text-dark-200">{notif.text}</p>
+                  <p className="font-medium text-dark-850 dark:text-dark-200 leading-snug">{notif.text}</p>
                   <span className="text-[10px] text-dark-400 block mt-1">
                     {new Date(notif.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>

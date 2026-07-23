@@ -90,22 +90,25 @@ class EmployeeService {
       throw new AppError('Employee not found.', 404);
     }
 
+    const user = await UserRepository.findById(employee.userId);
+    if (!user) {
+      throw new AppError('Associated user not found.', 404);
+    }
+    const oldEmail = user.email;
+
     // 1. Update User Details (name, email)
     if (name || email) {
-      const user = await UserRepository.findById(employee.userId);
-      if (user) {
-        const userUpdates = {};
-        if (name) userUpdates.name = name;
-        if (email) {
-          // Check if email already in use by another user
-          const existingUser = await UserRepository.findByEmail(email);
-          if (existingUser && existingUser._id.toString() !== user._id.toString()) {
-            throw new AppError('Email is already in use.', 400);
-          }
-          userUpdates.email = email;
+      const userUpdates = {};
+      if (name) userUpdates.name = name;
+      if (email) {
+        // Check if email already in use by another user
+        const existingUser = await UserRepository.findByEmail(email);
+        if (existingUser && existingUser._id.toString() !== user._id.toString()) {
+          throw new AppError('Email is already in use.', 400);
         }
-        await UserRepository.update(user._id, userUpdates);
+        userUpdates.email = email;
       }
+      await UserRepository.update(user._id, userUpdates);
     }
 
     // 2. Update Employee Details
@@ -139,13 +142,16 @@ class EmployeeService {
     const finalName = name || finalUser?.name;
 
     if (finalRoleName === 'Waiter') {
-      const waiterUpdates = { name: finalName, email: finalEmail };
-      if (password) waiterUpdates.password = password;
-      if (branchId) waiterUpdates.branchId = branchId;
-
-      const existingWaiter = await Waiter.findOne({ email: finalUser?.email });
+      const existingWaiter = await Waiter.findOne({ email: oldEmail });
       if (existingWaiter) {
-        await Waiter.findByIdAndUpdate(existingWaiter._id, waiterUpdates);
+        existingWaiter.name = finalName;
+        existingWaiter.email = finalEmail;
+        if (status) existingWaiter.status = status;
+        if (branchId) existingWaiter.branchId = branchId;
+        if (password) {
+          existingWaiter.password = password; // Trigger save/hash hook
+        }
+        await existingWaiter.save();
       } else {
         // Create waiter if it didn't exist
         await Waiter.create({
@@ -153,12 +159,13 @@ class EmployeeService {
           branchId: branchId || employee.branchId,
           name: finalName,
           email: finalEmail,
-          password: password || 'TemporaryPassword123!'
+          password: password || 'TemporaryPassword123!',
+          status: status || 'active'
         });
       }
     } else {
       // If role was changed from Waiter to something else, remove the Waiter account
-      await Waiter.findOneAndDelete({ email: finalUser?.email });
+      await Waiter.findOneAndDelete({ email: oldEmail });
     }
 
     await EmployeeRepository.update(employeeId, updates);

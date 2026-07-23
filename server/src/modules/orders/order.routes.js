@@ -4,7 +4,14 @@ import {
   getOrders,
   updateOrderStatus,
   processPayment,
-  updateOrderItemStatus
+  updateOrderItemStatus,
+  cancelOrder,
+  cancelOrderItem,
+  recallOrder,
+  splitBill,
+  mergeTables,
+  splitTables,
+  transferOrder
 } from './order.controller.js';
 import { protect, restrictTo } from '../../middleware/auth.middleware.js';
 import { protectWaiter } from '../../middleware/waiter.middleware.js';
@@ -26,18 +33,29 @@ const protectAny = (req, res, next) => {
   });
 };
 
+// Item status, cancellations, split bill, and waiter transfer
 router.patch('/items/:itemId/status', protectAny, updateOrderItemStatus);
+router.patch('/:orderId/items/:itemId/cancel', protectAny, cancelOrderItem);
+router.patch('/:orderId/cancel', protectAny, cancelOrder);
+router.post('/:orderId/split-bill', protectAny, splitBill);
+router.post('/:orderId/transfer-waiter', protectAny, transferOrder);
 
+// Middleware to protect subsequent routes for admin/branch employees
 router.use(protect);
 
 router.route('/')
   .get(restrictTo('order:read'), getOrders)
   .post(restrictTo('order:write'), createOrder);
 
+router.post('/merge-tables', restrictTo('order:write'), mergeTables);
+router.post('/split-tables', restrictTo('order:write'), splitTables);
+
 router.route('/:orderId/status')
   .patch(restrictTo('order:write'), updateOrderStatus);
 
 router.route('/:orderId/pay')
   .post(restrictTo('order:write'), processPayment);
+
+router.patch('/:orderId/recall', restrictTo('order:write'), recallOrder);
 
 export default router;

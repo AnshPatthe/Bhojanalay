@@ -24,12 +24,12 @@ export const Modal = ({ isOpen, onClose, title, children, className }) => {
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: "spring", duration: 0.4 }}
             className={cn(
-              "relative z-10 w-full max-w-lg rounded-xl border border-dark-200 dark:border-dark-800 bg-white dark:bg-dark-900 p-6 shadow-2xl dark:text-white",
+              "relative z-10 w-full max-w-lg rounded-xl border border-dark-200 dark:border-dark-800 bg-white dark:bg-dark-900 p-6 shadow-2xl dark:text-white flex flex-col max-h-[90vh]",
               className
             )}
           >
             {/* Header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
               {title && <h3 className="text-lg font-semibold font-heading">{title}</h3>}
               <button
                 onClick={onClose}
@@ -40,7 +40,7 @@ export const Modal = ({ isOpen, onClose, title, children, className }) => {
             </div>
 
             {/* Body */}
-            <div className="text-dark-600 dark:text-dark-300">{children}</div>
+            <div className="text-dark-600 dark:text-dark-300 overflow-y-auto flex-1 min-h-0 pr-1">{children}</div>
           </motion.div>
         </div>
       )}

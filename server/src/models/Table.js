@@ -29,7 +29,7 @@ const tableSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['Available', 'Occupied', 'Reserved', 'Cleaning', 'Billing'],
+    enum: ['Available', 'Occupied', 'Reserved', 'Cleaning', 'Billing', 'Preparing'],
     default: 'Available'
   }
 }, {

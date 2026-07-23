@@ -44,7 +44,8 @@ export const getOrders = catchAsync(async (req, res, next) => {
 export const updateOrderStatus = catchAsync(async (req, res, next) => {
   const order = await OrderService.updateOrderStatus(
     req.params.orderId,
-    req.body.status
+    req.body.status,
+    req.employee?._id || null
   );
 
   res.status(200).json({
@@ -56,51 +57,9 @@ export const updateOrderStatus = catchAsync(async (req, res, next) => {
 export const updateOrderItemStatus = catchAsync(async (req, res, next) => {
   const { itemId } = req.params;
   const { status } = req.body;
+  const employeeId = req.employee?._id || null;
 
-  const validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
-  if (!validStatuses.includes(status)) {
-    return next(new AppError('Invalid item status.', 400));
-  }
-
-  const item = await OrderItem.findByIdAndUpdate(
-    itemId,
-    { status },
-    { new: true, runValidators: true }
-  );
-
-  if (!item) {
-    return next(new AppError('Order item not found.', 404));
-  }
-
-  const order = await Order.findById(item.orderId);
-  if (!order) {
-    return next(new AppError('Order not found for this item.', 404));
-  }
-
-  const items = await OrderItem.find({ orderId: order._id });
-
-  // Update order status to 'ready' if all active items are ready or served
-  const activeItems = items.filter(i => i.status !== 'cancelled');
-  const allReady = activeItems.every(i => ['ready', 'served'].includes(i.status));
-  if (allReady && activeItems.length > 0 && order.status !== 'ready' && order.status !== 'billing' && order.status !== 'completed' && order.status !== 'cancelled') {
-    order.status = 'ready';
-    await order.save();
-  }
-
-  try {
-    const io = getIO();
-    io.to(order.branchId.toString()).emit('order_status_updated', {
-      orderId: order._id,
-      status: order.status,
-      order: {
-        ...order.toObject(),
-        items
-      }
-    });
-    io.to(order.branchId.toString()).emit('tables_updated');
-  } catch (socketErr) {
-    console.error('[Socket] Failed to broadcast item status update', socketErr.message);
-  }
+  const item = await OrderService.updateOrderItemStatus(itemId, status, employeeId);
 
   res.status(200).json({
     status: 'success',
@@ -126,3 +85,91 @@ export const processPayment = catchAsync(async (req, res, next) => {
     data: result
   });
 });
+
+export const cancelOrder = catchAsync(async (req, res, next) => {
+  const { orderId } = req.params;
+  const { reason } = req.body;
+  const employeeId = req.employee?._id || null;
+
+  const order = await OrderService.cancelOrder(orderId, reason, employeeId);
+
+  res.status(200).json({
+    status: 'success',
+    data: order
+  });
+});
+
+export const cancelOrderItem = catchAsync(async (req, res, next) => {
+  const { orderId, itemId } = req.params;
+  const { reason } = req.body;
+  const employeeId = req.employee?._id || null;
+
+  const item = await OrderService.cancelOrderItem(orderId, itemId, reason, employeeId);
+
+  res.status(200).json({
+    status: 'success',
+    data: item
+  });
+});
+
+export const recallOrder = catchAsync(async (req, res, next) => {
+  const { orderId } = req.params;
+  const employeeId = req.employee?._id || null;
+
+  const order = await OrderService.recallOrderToPreparing(orderId, employeeId);
+
+  res.status(200).json({
+    status: 'success',
+    data: order
+  });
+});
+
+export const splitBill = catchAsync(async (req, res, next) => {
+  const { orderId } = req.params;
+  const { count } = req.body;
+
+  const bill = await OrderService.splitBill(orderId, parseInt(count, 10));
+
+  res.status(200).json({
+    status: 'success',
+    data: bill
+  });
+});
+
+export const mergeTables = catchAsync(async (req, res, next) => {
+  const branchId = req.employee?.branchId?._id || req.headers['x-branch-id'];
+  const { tables } = req.body;
+
+  const result = await OrderService.mergeTables(branchId, tables);
+
+  res.status(200).json({
+    status: 'success',
+    data: result
+  });
+});
+
+export const splitTables = catchAsync(async (req, res, next) => {
+  const branchId = req.employee?.branchId?._id || req.headers['x-branch-id'];
+  const { tableNumber } = req.body;
+
+  const result = await OrderService.splitMergedTables(branchId, tableNumber);
+
+  res.status(200).json({
+    status: 'success',
+    data: result
+  });
+});
+
+export const transferOrder = catchAsync(async (req, res, next) => {
+  const { orderId } = req.params;
+  const { newWaiterId } = req.body;
+
+  const order = await OrderService.transferOrder(orderId, newWaiterId);
+
+  res.status(200).json({
+    status: 'success',
+    data: order
+  });
+});
+
+

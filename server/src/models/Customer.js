@@ -25,6 +25,23 @@ const customerSchema = new mongoose.Schema({
   loyaltyPoints: {
     type: Number,
     default: 0
+  },
+  isVIP: {
+    type: Boolean,
+    default: false
+  },
+  allergies: {
+    type: String,
+    default: ''
+  },
+  favoriteFood: {
+    type: String,
+    default: ''
+  },
+  birthday: Date,
+  notes: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

@@ -27,6 +27,10 @@ export const useWaiterAuth = create(
         }
       },
 
+      updateProfile: (updatedWaiter) => {
+        set({ waiter: updatedWaiter });
+      },
+
       logout: () => {
         delete waiterApi.defaults.headers.common['Authorization'];
         set({

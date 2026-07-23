@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Select, Drawer, Spinner } from '@/components/ui';
-import { Plus, Trash2, Edit2, Users, Layers, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, Users, Layers, AlertCircle, CheckCircle2, RefreshCw, QrCode } from 'lucide-react';
 import api from '@/api';
 import { TableDetails } from './TableDetails';
+import { TableQRModal } from './TableQRModal';
 
 export const TableManager = ({ socket }) => {
   const [tables, setTables] = useState([]);
@@ -18,6 +19,21 @@ export const TableManager = ({ socket }) => {
   // Table details states for live view
   const [selectedTableForDetails, setSelectedTableForDetails] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+
+  // QR Modal State
+  const [isQRModalOpen, setIsQRModalOpen] = useState(false);
+  const [selectedQRTable, setSelectedQRTable] = useState(null);
+
+  const handleOpenQR = (table, e) => {
+    if (e) e.stopPropagation();
+    setSelectedQRTable(table);
+    setIsQRModalOpen(true);
+  };
+
+  const handleOpenAllQRs = () => {
+    setSelectedQRTable(null);
+    setIsQRModalOpen(true);
+  };
   
   const [form, setForm] = useState({
     tableNumber: '',
@@ -199,9 +215,15 @@ export const TableManager = ({ socket }) => {
         </div>
         <div className="flex items-center gap-2">
           {viewMode === 'config' && (
-            <Button variant="primary" onClick={handleOpenAdd} className="flex items-center gap-2">
-              <Plus className="h-4 w-4" /> Add Table
-            </Button>
+            <>
+              <Button variant="secondary" onClick={handleOpenAllQRs} className="flex items-center gap-2">
+                <QrCode className="h-4 w-4 text-brand-650" />
+                <span>Table QRs</span>
+              </Button>
+              <Button variant="primary" onClick={handleOpenAdd} className="flex items-center gap-2">
+                <Plus className="h-4 w-4" /> Add Table
+              </Button>
+            </>
           )}
           <Button variant="secondary" onClick={fetchTables} size="sm" className="h-10 px-3">
             <RefreshCw className="h-4 w-4" />
@@ -237,7 +259,7 @@ export const TableManager = ({ socket }) => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-white dark:bg-dark-850 border border-dark-200 dark:border-dark-800 shadow-sm">
           <CardContent className="p-5 flex items-center gap-4">
             <div className="p-3 bg-brand-500/10 text-brand-650 dark:text-brand-400 rounded-xl">
@@ -346,7 +368,7 @@ export const TableManager = ({ socket }) => {
                   </span>
                 </div>
 
-                {/* Table Cards Grid */}
+                {/* Table Cards Grid - Tighter & Compact */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                   {groupedTables[floor]?.map((table) => {
                     const normalizedStatus = table.status === 'Free' ? 'Available' : table.status;
@@ -359,20 +381,20 @@ export const TableManager = ({ socket }) => {
                             setIsDetailsOpen(true);
                           }
                         }}
-                        className={`bg-white dark:bg-dark-850 border shadow-sm relative overflow-hidden group hover:shadow-md transition-all duration-300 flex flex-col justify-between ${
+                        className={`bg-white dark:bg-dark-850 border shadow-sm relative overflow-hidden group hover:shadow-lg transition-all duration-300 flex flex-col justify-between min-h-[130px] ${
                           viewMode === 'live' ? 'cursor-pointer' : ''
                         } ${getCardStatusBorder(table)}`}
                       >
-                        <CardContent className="p-4 flex flex-col items-center justify-center gap-2 text-center flex-grow">
+                        <CardContent className="p-4 flex flex-col items-center justify-center gap-2.5 text-center flex-grow">
                           {/* Table Number */}
-                          <div className="text-2xl font-extrabold text-dark-900 dark:text-white font-heading">
+                          <div className="text-lg sm:text-xl font-black text-dark-900 dark:text-white font-heading tracking-tight">
                             {table.tableNumber}
                           </div>
                           
                           {/* Seats Capacity */}
-                          <div className="flex items-center gap-1.5 text-xs text-dark-500 font-medium">
-                            <Users className="h-3.5 w-3.5" />
-                            <span>{table.capacity} Seats</span>
+                          <div className="flex items-center gap-1 text-[10px] text-dark-500 font-semibold bg-dark-50 dark:bg-dark-800/60 px-2 py-0.5 rounded-lg border border-dark-100 dark:border-dark-750">
+                            <Users className="h-3.5 w-3.5 text-brand-650" />
+                            <span>{table.capacity} Seater</span>
                           </div>
 
                           {/* Status Badge */}
@@ -381,9 +403,18 @@ export const TableManager = ({ socket }) => {
                           </span>
                         </CardContent>
 
-                        {/* Hover Action Buttons (Config mode only) */}
+                        {/* Config Action Buttons */}
                         {viewMode === 'config' && (
-                          <div className="border-t border-dark-100 dark:border-dark-800 p-2 flex items-center justify-between gap-1.5 bg-dark-50/50 dark:bg-dark-900/30">
+                          <div className="border-t border-dark-100 dark:border-dark-800 p-2 flex items-center justify-between gap-1.5 bg-dark-50/60 dark:bg-dark-900/40">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => handleOpenQR(table, e)}
+                              className="flex-1 h-8 text-[11px] font-medium text-dark-700 hover:text-brand-650 dark:text-dark-300 dark:hover:text-brand-400 gap-1 rounded-lg border border-dark-200/60 dark:border-dark-750"
+                              title="View Table QR Code"
+                            >
+                              <QrCode className="h-3.5 w-3.5 text-brand-650" /> QR
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
@@ -391,7 +422,7 @@ export const TableManager = ({ socket }) => {
                                 e.stopPropagation();
                                 handleOpenEdit(table);
                               }}
-                              className="flex-1 h-8 text-xs text-dark-600 hover:text-brand-600 dark:text-dark-400 dark:hover:text-brand-400 gap-1 rounded-md"
+                              className="flex-1 h-8 text-[11px] font-medium text-dark-700 hover:text-brand-650 dark:text-dark-300 dark:hover:text-brand-400 gap-1 rounded-lg border border-dark-200/60 dark:border-dark-750"
                             >
                               <Edit2 className="h-3 w-3" /> Edit
                             </Button>
@@ -402,7 +433,7 @@ export const TableManager = ({ socket }) => {
                                 e.stopPropagation();
                                 handleDelete(table._id);
                               }}
-                              className="h-8 w-8 p-0 text-dark-400 hover:text-rose-600 dark:text-dark-500 dark:hover:text-rose-400 rounded-md"
+                              className="h-8 w-8 p-0 text-dark-400 hover:text-rose-650 dark:text-dark-500 dark:hover:text-rose-400 rounded-lg border border-dark-200/60 dark:border-dark-750"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
@@ -503,6 +534,15 @@ export const TableManager = ({ socket }) => {
         }}
         table={selectedTableForDetails}
         socket={socket}
+      />
+
+      {/* Table QR Code Generator & Printing Modal */}
+      <TableQRModal
+        isOpen={isQRModalOpen}
+        onClose={() => setIsQRModalOpen(false)}
+        table={selectedQRTable}
+        allTables={tables}
+        restaurantName="Vyavastha Restaurant"
       />
     </div>
   );

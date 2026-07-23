@@ -71,3 +71,21 @@ export const deleteModifier = catchAsync(async (req, res, next) => {
   await MenuService.deleteModifier(req.params.modifierId);
   res.status(204).json({ status: 'success', data: null });
 });
+
+// Image Upload
+export const uploadMenuItemImage = catchAsync(async (req, res, next) => {
+  if (!req.file) {
+    return next(new AppError('Please upload an image file', 400));
+  }
+
+  const fileUrl = `/assets/menu_items/${req.file.filename}`;
+
+  res.status(200).json({
+    status: 'success',
+    data: {
+      url: fileUrl,
+      filename: req.file.filename
+    }
+  });
+});
+

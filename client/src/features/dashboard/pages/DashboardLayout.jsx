@@ -6,11 +6,13 @@ import Topbar from '../components/Topbar';
 import Sidebar from '../components/Sidebar';
 import Overview from '../components/Overview';
 import OrdersManager from '@/features/live-orders/components/OrdersManager';
+import { KdsView } from '@/features/live-orders/components/KdsView';
 import MenuManager from '@/features/menu/components/MenuManager';
 import TableManager from '@/features/tables/components/TableManager';
 import StaffManager from '@/features/staff/components/StaffManager';
 import InventoryManager from '@/features/inventory/components/InventoryManager';
 import { getSocket } from '@/socket/socketClient';
+import api from '@/api';
 
 export const DashboardLayout = () => {
   const { isAuthenticated, currentRestaurant, currentBranch } = useAuthStore();
@@ -18,6 +20,24 @@ export const DashboardLayout = () => {
   const [isCollapsed, setIsCollapsed] = useState(window.innerWidth < 1024);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [socket, setSocket] = useState(null);
+  const [pendingLeavesCount, setPendingLeavesCount] = useState(0);
+
+  const fetchPendingLeaves = async () => {
+    try {
+      const res = await api.get('/employees/leaves');
+      const leaves = res.data.data || [];
+      const count = leaves.filter(l => l.status === 'Pending').length;
+      setPendingLeavesCount(count);
+    } catch (err) {
+      console.log('Failed to fetch pending leaves count for badge');
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated && currentRestaurant) {
+      fetchPendingLeaves();
+    }
+  }, [isAuthenticated, currentRestaurant, activeTab]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -90,6 +110,7 @@ export const DashboardLayout = () => {
           setIsCollapsed={setIsCollapsed}
           isMobileOpen={isMobileMenuOpen}
           setIsMobileOpen={setIsMobileMenuOpen}
+          pendingLeavesCount={pendingLeavesCount}
         />
 
         {/* Console Workspace viewport */}
@@ -100,6 +121,7 @@ export const DashboardLayout = () => {
         >
           {activeTab === 'overview' && <Overview setActiveTab={handleTabChange} />}
           {activeTab === 'orders' && <OrdersManager socket={socket} />}
+          {activeTab === 'kds' && <KdsView socket={socket} />}
           {activeTab === 'menu' && <MenuManager />}
           {activeTab === 'tables' && <TableManager socket={socket} />}
           {activeTab === 'staff' && <StaffManager />}

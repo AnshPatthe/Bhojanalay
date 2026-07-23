@@ -10,13 +10,17 @@ import {
   deleteMenuItem,
   getModifiers,
   createModifier,
-  deleteModifier
+  deleteModifier,
+  uploadMenuItemImage
 } from './menu.controller.js';
 import { protect, restrictTo } from '../../middleware/auth.middleware.js';
+import { uploadMenuItemImageMiddleware } from '../../middleware/upload.middleware.js';
 
 const router = express.Router();
 
 router.use(protect); // Apply protection globally to menu actions
+
+router.post('/upload', restrictTo('menu:write'), uploadMenuItemImageMiddleware, uploadMenuItemImage);
 
 router.route('/categories')
   .get(getCategories)

@@ -85,6 +85,14 @@ const orderSchema = new mongoose.Schema({
   notes: {
     type: String,
     trim: true
+  },
+  preparingAt: Date,
+  readyAt: Date,
+  cancellationReason: String,
+  priority: {
+    type: String,
+    enum: ['Normal', 'High', 'VIP', 'Urgent'],
+    default: 'Normal'
   }
 }, {
   timestamps: true

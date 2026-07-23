@@ -6,8 +6,31 @@ import Customer from '../../models/Customer.js';
 import Inventory from '../../models/Inventory.js';
 import Table from '../../models/Table.js';
 import Bill from '../../models/Bill.js';
+import Order from '../../models/Order.js';
 import { getIO } from '../../socket/socketServer.js';
 import AppError from '../../utils/AppError.js';
+
+const getMenuItemPrice = (menuItem) => {
+  if (!menuItem.happyHourPrice || !menuItem.happyHourStart || !menuItem.happyHourEnd) {
+    return menuItem.price;
+  }
+  
+  const now = new Date();
+  const day = now.getDay(); // 0-6
+  
+  // Check if today is one of the happy hour days
+  if (menuItem.happyHourDays && menuItem.happyHourDays.length > 0 && !menuItem.happyHourDays.includes(day)) {
+    return menuItem.price;
+  }
+  
+  // Check if current time is within happy hour range (HH:mm)
+  const currentHourMin = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  if (currentHourMin >= menuItem.happyHourStart && currentHourMin <= menuItem.happyHourEnd) {
+    return menuItem.happyHourPrice;
+  }
+  
+  return menuItem.price;
+};
 
 class OrderService {
   async createOrder(restaurantId, branchId, employeeId, orderData) {
@@ -35,17 +58,37 @@ class OrderService {
       }
     }
 
+    // Fetch all related MenuItems to apply Happy Hour pricing
+    const MenuItem = mongoose.model('MenuItem');
+    const menuItemIds = items.map(i => i.menuItemId);
+    const dbMenuItems = await MenuItem.find({ _id: { $in: menuItemIds } });
+
     // Check if there is an active dine-in order for this table
     let existingOrder = null;
     if (orderType === 'dine-in' && tableNumber) {
       existingOrder = await OrderRepository.findOne({
         branchId,
         tableNumber,
-        status: { $in: ['pending', 'preparing', 'ready'] }
+        status: { $in: ['pending', 'preparing', 'ready', 'billing'] }
       });
     }
 
     if (existingOrder) {
+      // Waiter Lock Check
+      if (['billing', 'completed', 'cancelled'].includes(existingOrder.status)) {
+        let isAdminOverride = false;
+        if (employeeId) {
+          const EmployeeModel = mongoose.model('Employee');
+          const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+          if (employee && employee.roleId && ['Owner', 'Manager'].includes(employee.roleId.name)) {
+            isAdminOverride = true;
+          }
+        }
+        if (!isAdminOverride) {
+          throw new AppError('This order is locked (billing/completed/cancelled). Modifications are locked without Admin override.', 400);
+        }
+      }
+
       console.log('[OrderService] existingOrder found:', existingOrder._id);
       const existingItems = await OrderItem.find({ orderId: existingOrder._id });
       console.log('[OrderService] DB existingItems:', existingItems.map(i => ({ name: i.name, qty: i.quantity, status: i.status })));
@@ -63,6 +106,9 @@ class OrderService {
       );
 
       for (const item of items) {
+        const dbItem = dbMenuItems.find(db => db._id.toString() === item.menuItemId.toString());
+        const basePrice = dbItem ? getMenuItemPrice(dbItem) : item.price;
+
         // Look for an existing item that is still 'pending'
         const pendingItem = existingItemsFiltered.find(
           i => i.menuItemId.toString() === item.menuItemId.toString() && i.status === 'pending'
@@ -75,9 +121,10 @@ class OrderService {
             pendingItem.quantity += item.quantity;
           }
 
-          let itemSubtotal = pendingItem.price * pendingItem.quantity;
+          let itemSubtotal = basePrice * pendingItem.quantity;
           const modifierCost = (pendingItem.modifiers || []).reduce((acc, mod) => acc + mod.price, 0);
           itemSubtotal += modifierCost * pendingItem.quantity;
+          pendingItem.price = basePrice;
           pendingItem.subtotal = itemSubtotal;
           pendingItem.notes = item.notes || pendingItem.notes;
           await pendingItem.save();
@@ -97,7 +144,7 @@ class OrderService {
             quantityToAdd = item.quantity - totalDbQty;
           }
 
-          let itemSubtotal = item.price * quantityToAdd;
+          let itemSubtotal = basePrice * quantityToAdd;
           const modifierCost = (item.modifiers || []).reduce((acc, mod) => acc + mod.price, 0);
           itemSubtotal += modifierCost * quantityToAdd;
 
@@ -106,7 +153,7 @@ class OrderService {
             menuItemId: item.menuItemId,
             name: item.name,
             quantity: quantityToAdd,
-            price: item.price,
+            price: basePrice,
             subtotal: itemSubtotal,
             modifiers: item.modifiers || [],
             notes: item.notes || '',
@@ -133,6 +180,23 @@ class OrderService {
       existingOrder.notes = notes || existingOrder.notes;
       if (orderData.waiterId) existingOrder.waiterId = orderData.waiterId;
       if (!existingOrder.tableId) existingOrder.tableId = orderTableId;
+
+      // Recalculate overall order status based on active items
+      const activeItems = allItems.filter(i => i.status !== 'cancelled');
+      const allReady = activeItems.every(i => ['ready', 'served'].includes(i.status));
+      const hasCookingOrPending = activeItems.some(i => ['pending', 'preparing'].includes(i.status));
+
+      if (allReady && activeItems.length > 0) {
+        if (!['ready', 'billing', 'completed', 'cancelled'].includes(existingOrder.status)) {
+          existingOrder.status = 'ready';
+          existingOrder.readyAt = Date.now();
+        }
+      } else if (hasCookingOrPending) {
+        if (['ready'].includes(existingOrder.status)) {
+          existingOrder.status = 'preparing';
+        }
+      }
+
       await existingOrder.save();
 
       // Check if bill exists and update it
@@ -211,7 +275,10 @@ class OrderService {
     let totalTax = 0;
 
     const itemsToCreate = items.map(item => {
-      let itemSubtotal = item.price * item.quantity;
+      const dbItem = dbMenuItems.find(db => db._id.toString() === item.menuItemId.toString());
+      const basePrice = dbItem ? getMenuItemPrice(dbItem) : item.price;
+
+      let itemSubtotal = basePrice * item.quantity;
       // Modifiers subtotal addition
       const modifierCost = (item.modifiers || []).reduce((acc, mod) => acc + mod.price, 0);
       itemSubtotal += modifierCost * item.quantity;
@@ -226,7 +293,7 @@ class OrderService {
         menuItemId: item.menuItemId,
         name: item.name,
         quantity: item.quantity,
-        price: item.price,
+        price: basePrice,
         subtotal: itemSubtotal,
         modifiers: item.modifiers || [],
         notes: item.notes || ''
@@ -316,16 +383,50 @@ class OrderService {
     return populatedOrders;
   }
 
-  async updateOrderStatus(orderId, status) {
+  async updateOrderStatus(orderId, status, employeeId = null) {
     const validStatuses = ['pending', 'preparing', 'ready', 'billing', 'completed', 'cancelled'];
     if (!validStatuses.includes(status)) {
       throw new AppError('Invalid order status.', 400);
     }
 
-    const order = await OrderRepository.update(orderId, { status });
+    const order = await Order.findById(orderId);
     if (!order) {
       throw new AppError('Order not found.', 404);
     }
+
+    // Role check for waiter lock
+    let isAdminOverride = false;
+    if (employeeId) {
+      const EmployeeModel = mongoose.model('Employee');
+      const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+      if (employee && employee.roleId && ['Owner', 'Manager'].includes(employee.roleId.name)) {
+        isAdminOverride = true;
+      }
+    }
+
+    // If order status is preparing/ready, lock waiter changes
+    if (['preparing', 'ready'].includes(order.status) && !isAdminOverride) {
+      throw new AppError('This order is currently preparing or ready in the kitchen. Status transitions are locked without Admin override.', 400);
+    }
+
+    order.status = status;
+    if (status === 'preparing') {
+      order.preparingAt = Date.now();
+      // Set all pending items to preparing
+      await OrderItem.updateMany(
+        { orderId: order._id, status: 'pending' },
+        { status: 'preparing', preparingAt: Date.now() }
+      );
+    } else if (status === 'ready') {
+      order.readyAt = Date.now();
+      // Set all preparing/pending items to ready
+      await OrderItem.updateMany(
+        { orderId: order._id, status: { $in: ['pending', 'preparing'] } },
+        { status: 'ready', readyAt: Date.now() }
+      );
+    }
+
+    await order.save();
 
     if (status === 'completed' || status === 'cancelled') {
       try {
@@ -338,7 +439,32 @@ class OrderService {
       } catch (err) {
         console.error('[OrderService] Failed to release table', err.message);
       }
+    } else if (status === 'preparing') {
+      try {
+        if (order.orderType === 'dine-in' && order.tableNumber) {
+          await Table.findOneAndUpdate(
+            { branchId: order.branchId, tableNumber: order.tableNumber },
+            { status: 'Preparing' }
+          );
+        }
+      } catch (err) {
+        console.error('[OrderService] Failed to set table to Preparing', err.message);
+      }
+    } else if (status === 'ready') {
+      try {
+        if (order.orderType === 'dine-in' && order.tableNumber) {
+          await Table.findOneAndUpdate(
+            { branchId: order.branchId, tableNumber: order.tableNumber },
+            { status: 'Occupied' }
+          );
+        }
+      } catch (err) {
+        console.error(err);
+      }
     }
+
+    // Refresh order items
+    const items = await OrderItem.find({ orderId: order._id });
 
     // Broadcast update
     try {
@@ -346,7 +472,10 @@ class OrderService {
       io.to(order.branchId.toString()).emit('order_status_updated', {
         orderId: order._id,
         status,
-        order
+        order: {
+          ...order.toObject(),
+          items
+        }
       });
       io.to(order.branchId.toString()).emit('tables_updated');
     } catch (socketErr) {
@@ -407,6 +536,409 @@ class OrderService {
       order,
       payment
     };
+  }
+
+  async updateOrderItemStatus(itemId, status, employeeId = null) {
+    const validStatuses = ['pending', 'preparing', 'ready', 'served', 'cancelled'];
+    if (!validStatuses.includes(status)) {
+      throw new AppError('Invalid item status.', 400);
+    }
+
+    const item = await OrderItem.findById(itemId);
+    if (!item) {
+      throw new AppError('Order item not found.', 404);
+    }
+
+    const order = await Order.findById(item.orderId);
+    if (!order) {
+      throw new AppError('Order not found for this item.', 404);
+    }
+
+    let isAdminOverride = false;
+    if (employeeId) {
+      const EmployeeModel = mongoose.model('Employee');
+      const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+      if (employee && employee.roleId && ['Owner', 'Manager'].includes(employee.roleId.name)) {
+        isAdminOverride = true;
+      }
+    }
+
+    if (['preparing', 'ready'].includes(item.status) && status === 'cancelled' && !isAdminOverride) {
+      throw new AppError('This item is currently being prepared or is ready. Cancellations are locked without Admin override.', 400);
+    }
+
+    item.status = status;
+    if (status === 'preparing') {
+      item.preparingAt = Date.now();
+      if (order.status === 'pending') {
+        order.status = 'preparing';
+        order.preparingAt = Date.now();
+        await order.save();
+
+        if (order.orderType === 'dine-in' && order.tableNumber) {
+          await Table.findOneAndUpdate(
+            { branchId: order.branchId, tableNumber: order.tableNumber },
+            { status: 'Preparing' }
+          );
+        }
+      }
+    } else if (status === 'ready') {
+      item.readyAt = Date.now();
+    }
+    
+    await item.save();
+
+    const items = await OrderItem.find({ orderId: order._id });
+    const activeItems = items.filter(i => i.status !== 'cancelled');
+    const allReady = activeItems.every(i => ['ready', 'served'].includes(i.status));
+    
+    if (allReady && activeItems.length > 0 && !['ready', 'billing', 'completed', 'cancelled'].includes(order.status)) {
+      order.status = 'ready';
+      order.readyAt = Date.now();
+      await order.save();
+    }
+
+    order.items = items.map(i => ({
+      menuItemId: i.menuItemId,
+      name: i.name,
+      quantity: i.quantity,
+      price: i.price,
+      subtotal: i.subtotal,
+      modifiers: i.modifiers,
+      notes: i.notes
+    }));
+    await order.save();
+
+    try {
+      const io = getIO();
+      const populatedOrder = {
+        ...order.toObject(),
+        items
+      };
+      io.to(order.branchId.toString()).emit('order_status_updated', {
+        orderId: order._id,
+        status: order.status,
+        order: populatedOrder
+      });
+      io.to(order.branchId.toString()).emit('tables_updated');
+    } catch (socketErr) {
+      console.error('[Socket] Failed to broadcast item status update', socketErr.message);
+    }
+
+    return item;
+  }
+
+  async cancelOrder(orderId, reason, employeeId = null) {
+    if (!reason) {
+      throw new AppError('Cancellation reason is required.', 400);
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Order not found.', 404);
+    }
+
+    let isAdminOverride = false;
+    if (employeeId) {
+      const EmployeeModel = mongoose.model('Employee');
+      const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+      if (employee && employee.roleId && ['Owner', 'Manager'].includes(employee.roleId.name)) {
+        isAdminOverride = true;
+      }
+    }
+
+    if (order.status !== 'pending' && !isAdminOverride) {
+      throw new AppError('Only pending orders can be cancelled without Admin override.', 400);
+    }
+
+    order.status = 'cancelled';
+    order.cancellationReason = reason;
+    await order.save();
+
+    await OrderItem.updateMany(
+      { orderId: order._id },
+      { status: 'cancelled', cancellationReason: reason }
+    );
+
+    if (order.orderType === 'dine-in' && order.tableNumber) {
+      await Table.findOneAndUpdate(
+        { branchId: order.branchId, tableNumber: order.tableNumber },
+        { status: 'Available' }
+      );
+    }
+
+    const items = await OrderItem.find({ orderId: order._id });
+
+    try {
+      const io = getIO();
+      const populatedOrder = {
+        ...order.toObject(),
+        items
+      };
+      io.to(order.branchId.toString()).emit('order_status_updated', {
+        orderId: order._id,
+        status: 'cancelled',
+        order: populatedOrder
+      });
+      io.to(order.branchId.toString()).emit('tables_updated');
+    } catch (socketErr) {
+      console.error('[Socket] Failed to broadcast order cancellation', socketErr.message);
+    }
+
+    return order;
+  }
+
+  async cancelOrderItem(orderId, itemId, reason, employeeId = null) {
+    if (!reason) {
+      throw new AppError('Cancellation reason is required.', 400);
+    }
+
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Order not found.', 404);
+    }
+
+    const item = await OrderItem.findById(itemId);
+    if (!item) {
+      throw new AppError('Order item not found.', 404);
+    }
+
+    let isAdminOverride = false;
+    if (employeeId) {
+      const EmployeeModel = mongoose.model('Employee');
+      const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+      if (employee && employee.roleId && ['Owner', 'Manager'].includes(employee.roleId.name)) {
+        isAdminOverride = true;
+      }
+    }
+
+    if (item.status !== 'pending' && !isAdminOverride) {
+      throw new AppError('Only pending items can be cancelled, unless overridden by an Admin.', 400);
+    }
+
+    item.status = 'cancelled';
+    item.cancellationReason = reason;
+    await item.save();
+
+    const items = await OrderItem.find({ orderId: order._id });
+    const activeItems = items.filter(i => i.status !== 'cancelled');
+
+    let subtotal = 0;
+    let totalTax = 0;
+    for (const savedItem of activeItems) {
+      subtotal += savedItem.subtotal;
+      const taxRate = savedItem.taxPercentage ? savedItem.taxPercentage / 100 : 0.08;
+      totalTax += savedItem.subtotal * taxRate;
+    }
+
+    order.subtotal = subtotal;
+    order.tax = totalTax;
+    order.total = subtotal + totalTax;
+
+    if (activeItems.length === 0) {
+      order.status = 'cancelled';
+      order.cancellationReason = `All items cancelled: ${reason}`;
+      if (order.orderType === 'dine-in' && order.tableNumber) {
+        await Table.findOneAndUpdate(
+          { branchId: order.branchId, tableNumber: order.tableNumber },
+          { status: 'Available' }
+        );
+      }
+    } else {
+      const allReady = activeItems.every(i => ['ready', 'served'].includes(i.status));
+      if (allReady && !['ready', 'billing', 'completed', 'cancelled'].includes(order.status)) {
+        order.status = 'ready';
+        order.readyAt = Date.now();
+      }
+    }
+
+    order.items = items.map(i => ({
+      menuItemId: i.menuItemId,
+      name: i.name,
+      quantity: i.quantity,
+      price: i.price,
+      subtotal: i.subtotal,
+      modifiers: i.modifiers,
+      notes: i.notes
+    }));
+    await order.save();
+
+    try {
+      const io = getIO();
+      const populatedOrder = {
+        ...order.toObject(),
+        items
+      };
+      io.to(order.branchId.toString()).emit('order_status_updated', {
+        orderId: order._id,
+        status: order.status,
+        order: populatedOrder
+      });
+      io.to(order.branchId.toString()).emit('tables_updated');
+    } catch (socketErr) {
+      console.error('[Socket] Failed to broadcast item cancellation', socketErr.message);
+    }
+
+    return item;
+  }
+
+  async recallOrderToPreparing(orderId, employeeId = null) {
+    const order = await Order.findById(orderId);
+    if (!order) {
+      throw new AppError('Order not found.', 404);
+    }
+
+    let isAllowed = false;
+    if (employeeId) {
+      const EmployeeModel = mongoose.model('Employee');
+      const employee = await EmployeeModel.findById(employeeId).populate('roleId');
+      if (employee && employee.roleId && ['Owner', 'Manager', 'Chef'].includes(employee.roleId.name)) {
+        isAllowed = true;
+      }
+    }
+
+    if (!isAllowed) {
+      throw new AppError('Only Chefs or Admins can recall orders back to preparation.', 403);
+    }
+
+    order.status = 'preparing';
+    order.readyAt = undefined;
+    await order.save();
+
+    await OrderItem.updateMany(
+      { orderId: order._id, status: 'ready' },
+      { status: 'preparing', readyAt: undefined }
+    );
+
+    if (order.orderType === 'dine-in' && order.tableNumber) {
+      await Table.findOneAndUpdate(
+        { branchId: order.branchId, tableNumber: order.tableNumber },
+        { status: 'Preparing' }
+      );
+    }
+
+    const items = await OrderItem.find({ orderId: order._id });
+
+    try {
+      const io = getIO();
+      const populatedOrder = {
+        ...order.toObject(),
+        items
+      };
+      io.to(order.branchId.toString()).emit('order_status_updated', {
+        orderId: order._id,
+        status: 'preparing',
+        order: populatedOrder
+      });
+      io.to(order.branchId.toString()).emit('tables_updated');
+    } catch (socketErr) {
+      console.error('[Socket] Failed to broadcast recall', socketErr.message);
+    }
+
+    return order;
+  }
+
+  async splitBill(orderId, splitCount) {
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError('Order not found.', 404);
+
+    const items = await OrderItem.find({ orderId: order._id });
+    if (items.length === 0) throw new AppError('Cannot split bill of empty order.', 400);
+
+    let bill = await Bill.findOne({ orderId: order._id, paymentStatus: 'unpaid' });
+    if (!bill) {
+      throw new AppError('No generated bill found. Please generate the bill first before splitting.', 400);
+    }
+
+    const splitAmount = parseFloat((bill.grandTotal / splitCount).toFixed(2));
+    const splits = Array.from({ length: splitCount }, (_, i) => ({
+      splitIndex: i + 1,
+      amount: splitAmount,
+      status: 'unpaid'
+    }));
+
+    bill.splits = splits;
+    bill.isSplit = true;
+    await bill.save();
+
+    return bill;
+  }
+
+  async mergeTables(branchId, tableNumbers) {
+    if (!tableNumbers || tableNumbers.length < 2) {
+      throw new AppError('At least 2 tables are required to merge.', 400);
+    }
+
+    const tablesList = await Table.find({ branchId, tableNumber: { $in: tableNumbers } });
+    if (tablesList.length !== tableNumbers.length) {
+      throw new AppError('Some tables were not found.', 404);
+    }
+
+    const targetTable = tablesList[0];
+    const otherTables = tablesList.slice(1);
+
+    for (const t of otherTables) {
+      t.status = 'Occupied';
+      t.notes = `Merged with ${targetTable.tableNumber}`;
+      await t.save();
+    }
+    
+    targetTable.notes = `Merged with ${otherTables.map(o => o.tableNumber).join(', ')}`;
+    await targetTable.save();
+
+    try {
+      const io = getIO();
+      io.to(branchId.toString()).emit('tables_updated');
+    } catch (err) {
+      console.error(err);
+    }
+
+    return { message: 'Tables merged successfully.', tables: tablesList };
+  }
+
+  async splitMergedTables(branchId, tableNumber) {
+    const table = await Table.findOne({ branchId, tableNumber });
+    if (!table) throw new AppError('Table not found.', 404);
+
+    table.notes = '';
+    table.status = 'Available';
+    await table.save();
+
+    try {
+      const io = getIO();
+      io.to(branchId.toString()).emit('tables_updated');
+    } catch (err) {
+      console.error(err);
+    }
+
+    return { message: 'Table split successfully.' };
+  }
+
+  async transferOrder(orderId, newWaiterId) {
+    const order = await Order.findById(orderId);
+    if (!order) throw new AppError('Order not found.', 404);
+
+    const WaiterModel = mongoose.model('Waiter');
+    const newWaiter = await WaiterModel.findById(newWaiterId);
+    if (!newWaiter) throw new AppError('Target waiter not found.', 404);
+
+    order.waiterId = newWaiterId;
+    await order.save();
+
+    await Bill.findOneAndUpdate({ orderId: order._id }, { waiterId: newWaiterId });
+
+    try {
+      const io = getIO();
+      io.to(order.branchId.toString()).emit('order_status_updated', {
+        orderId: order._id,
+        status: order.status,
+        order
+      });
+    } catch (err) {
+      console.error(err);
+    }
+
+    return order;
   }
 }
 

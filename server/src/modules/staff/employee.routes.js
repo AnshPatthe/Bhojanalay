@@ -4,7 +4,9 @@ import {
   addEmployee,
   updateEmployee,
   deleteEmployee,
-  getRoles
+  getRoles,
+  getLeaveRequests,
+  updateLeaveStatus
 } from './employee.controller.js';
 import { protect, restrictTo } from '../../middleware/auth.middleware.js';
 
@@ -18,6 +20,10 @@ router.route('/')
 
 router.route('/roles')
   .get(getRoles);
+
+// Leave management routes
+router.get('/leaves', restrictTo('employees:manage'), getLeaveRequests);
+router.patch('/leaves/:leaveId/status', restrictTo('employees:manage'), updateLeaveStatus);
 
 router.route('/:employeeId')
   .put(restrictTo('employees:manage'), updateEmployee)

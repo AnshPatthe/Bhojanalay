@@ -92,7 +92,20 @@ const billSchema = new mongoose.Schema({
     enum: ['unpaid', 'paid'],
     default: 'unpaid',
     index: true
-  }
+  },
+  isSplit: {
+    type: Boolean,
+    default: false
+  },
+  splits: [{
+    splitIndex: Number,
+    amount: Number,
+    status: {
+      type: String,
+      enum: ['unpaid', 'paid'],
+      default: 'unpaid'
+    }
+  }]
 }, {
   timestamps: true
 });

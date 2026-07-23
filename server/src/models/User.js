@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
   email: {
@@ -27,6 +27,13 @@ const userSchema = new mongoose.Schema({
   emailVerificationToken: String,
   resetPasswordToken: String,
   resetPasswordExpires: Date,
+  otpCode: String,
+  otpExpires: Date,
+  otpAttempts: {
+    type: Number,
+    default: 0
+  },
+  otpSentAt: Date,
   refreshToken: String,
   profilePhoto: {
     type: String,

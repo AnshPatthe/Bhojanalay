@@ -46,6 +46,27 @@ const menuItemSchema = new mongoose.Schema({
   prepTimeMinutes: {
     type: Number,
     default: 15
+  },
+  happyHourPrice: {
+    type: Number,
+    default: null
+  },
+  happyHourStart: {
+    type: String,
+    default: ''
+  },
+  happyHourEnd: {
+    type: String,
+    default: ''
+  },
+  happyHourDays: {
+    type: [Number],
+    default: []
+  },
+  station: {
+    type: String,
+    enum: ['Main Course', 'Tandoor', 'Chinese', 'Snacks', 'Beverages', 'Desserts', 'General'],
+    default: 'General'
   }
 }, {
   timestamps: true

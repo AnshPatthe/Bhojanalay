@@ -8,7 +8,9 @@ import { Login, Register, ForgotPassword, ResetPassword, Verification } from '@/
 import { OnboardingWizard } from '@/features/onboarding';
 import { DashboardLayout } from '@/features/dashboard';
 import { WaiterDashboard, WaiterOrderScreen } from '@/features/waiter';
+import { CustomerOrderScreen } from '@/features/customer/pages/CustomerOrderScreen';
 import { useWaiterAuth } from '@/features/waiter/store/useWaiterAuth';
+import { WaiterPayslip } from '@/features/payroll/pages/WaiterPayslip';
 
 // Guard: Only allow authenticated users
 const ProtectedRoute = ({ children }) => {
@@ -28,7 +30,7 @@ const PublicRoute = ({ children }) => {
 
 const WaiterProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useWaiterAuth();
-  return isAuthenticated ? children : <Navigate to="/waiter/login" replace />;
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
 
@@ -72,6 +74,11 @@ export const AppRoutes = () => {
       {/* Waiter Module Routes */}
       <Route path="/waiter/dashboard" element={<WaiterProtectedRoute><WaiterDashboard /></WaiterProtectedRoute>} />
       <Route path="/waiter/order/:tableId" element={<WaiterProtectedRoute><WaiterOrderScreen /></WaiterProtectedRoute>} />
+      <Route path="/waiter/payslip/:payrollId" element={<WaiterProtectedRoute><WaiterPayslip /></WaiterProtectedRoute>} />
+
+      {/* Public Customer Self-Ordering via QR Code */}
+      <Route path="/customer/table/:tableId/order" element={<CustomerOrderScreen />} />
+      <Route path="/table/:tableId" element={<CustomerOrderScreen />} />
 
       {/* Fallback Catch-All Redirect */}
       <Route path="*" element={<Navigate to="/" replace />} />

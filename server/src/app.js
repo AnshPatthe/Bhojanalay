@@ -7,8 +7,14 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import hpp from 'hpp';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import AppError from './utils/AppError.js';
 import errorHandler from './middleware/error.middleware.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Route Imports
 import authRoutes from './modules/auth/auth.routes.js';
@@ -20,6 +26,8 @@ import inventoryRoutes from './modules/inventory/inventory.routes.js';
 import tableRoutes from './modules/tables/table.routes.js';
 import waiterRoutes from './modules/waiter/waiter.routes.js';
 import billingRoutes from './modules/billing/billing.routes.js';
+import customerRoutes from './modules/customer/customer.routes.js';
+import payrollRoutes from './modules/payroll/payroll.routes.js';
 
 const app = express();
 
@@ -55,6 +63,9 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 app.use(cookieParser());
 app.use(hpp()); // Prevent HTTP Parameter Pollution
 
+// Serve Static Assets (Menu images, etc.)
+app.use('/assets', express.static(path.join(__dirname, '../assets')));
+
 // Rate Limiting
 const limiter = rateLimit({
   max: process.env.NODE_ENV === 'development' ? 10000 : 100, // 10000 requests per IP in dev, 100 in production
@@ -73,6 +84,8 @@ app.use('/api/v1/inventory', inventoryRoutes);
 app.use('/api/v1/tables', tableRoutes);
 app.use('/api/v1/waiter', waiterRoutes);
 app.use('/api/v1/billing', billingRoutes);
+app.use('/api/v1/customer', customerRoutes);
+app.use('/api/v1/payroll', payrollRoutes);
 
 // Health Check Endpoint
 app.get('/api/v1/health', (req, res) => {

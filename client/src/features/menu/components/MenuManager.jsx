@@ -21,7 +21,20 @@ export const MenuManager = () => {
   const [selectedItemId, setSelectedItemId] = useState(null);
 
   const [categoryForm, setCategoryForm] = useState({ name: '', description: '' });
-  const [itemForm, setItemForm] = useState({ name: '', description: '', price: '', categoryId: '', isAvailable: true, image: '' });
+  const [itemForm, setItemForm] = useState({
+    name: '',
+    description: '',
+    price: '',
+    categoryId: '',
+    isAvailable: true,
+    image: '',
+    happyHourPrice: '',
+    happyHourStart: '',
+    happyHourEnd: '',
+    happyHourDays: [],
+    station: 'General'
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchMenuData = async () => {
     setLoading(true);
@@ -63,7 +76,19 @@ export const MenuManager = () => {
   const handleAddDishClick = () => {
     setIsEditMode(false);
     setSelectedItemId(null);
-    setItemForm({ name: '', description: '', price: '', categoryId: categories[0]?._id || '', isAvailable: true, image: '' });
+    setItemForm({
+      name: '',
+      description: '',
+      price: '',
+      categoryId: categories[0]?._id || '',
+      isAvailable: true,
+      image: '',
+      happyHourPrice: '',
+      happyHourStart: '',
+      happyHourEnd: '',
+      happyHourDays: [],
+      station: 'General'
+    });
     setIsItemDrawerOpen(true);
   };
 
@@ -76,7 +101,12 @@ export const MenuManager = () => {
       price: item.price?.toString() || '',
       categoryId: item.categoryId?._id || item.categoryId || '',
       isAvailable: item.isAvailable !== undefined ? item.isAvailable : true,
-      image: item.image || ''
+      image: item.image || '',
+      happyHourPrice: item.happyHourPrice?.toString() || '',
+      happyHourStart: item.happyHourStart || '',
+      happyHourEnd: item.happyHourEnd || '',
+      happyHourDays: item.happyHourDays || [],
+      station: item.station || 'General'
     });
     setIsItemDrawerOpen(true);
   };
@@ -92,7 +122,7 @@ export const MenuManager = () => {
     }
   };
 
-  const handleImageFileUpload = (e) => {
+  const handleImageFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -101,17 +131,31 @@ export const MenuManager = () => {
       return;
     }
 
-    // Limit file size to 3MB for base64 safety
-    if (file.size > 3 * 1024 * 1024) {
-      toast.error('Image size should be less than 3MB');
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image size should be less than 5MB');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setItemForm(prev => ({ ...prev, image: reader.result }));
-    };
-    reader.readAsDataURL(file);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    setUploadingImage(true);
+    try {
+      const res = await api.post('/menu/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      if (res.data?.data?.url) {
+        setItemForm(prev => ({ ...prev, image: res.data.data.url }));
+        toast.success('Image uploaded to menu_items!');
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload image');
+    } finally {
+      setUploadingImage(false);
+      e.target.value = '';
+    }
   };
 
   const handleAddItem = async () => {
@@ -119,7 +163,8 @@ export const MenuManager = () => {
     try {
       const payload = {
         ...itemForm,
-        price: parseFloat(itemForm.price)
+        price: parseFloat(itemForm.price),
+        happyHourPrice: itemForm.happyHourPrice ? parseFloat(itemForm.happyHourPrice) : undefined
       };
       
       if (isEditMode) {
@@ -130,7 +175,19 @@ export const MenuManager = () => {
         toast.success('Menu dish created!');
       }
       setIsItemDrawerOpen(false);
-      setItemForm({ name: '', description: '', price: '', categoryId: categories[0]?._id || '', isAvailable: true, image: '' });
+      setItemForm({
+        name: '',
+        description: '',
+        price: '',
+        categoryId: categories[0]?._id || '',
+        isAvailable: true,
+        image: '',
+        happyHourPrice: '',
+        happyHourStart: '',
+        happyHourEnd: '',
+        happyHourDays: [],
+        station: 'General'
+      });
       fetchMenuData();
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to ${isEditMode ? 'update' : 'create'} menu dish`);
@@ -283,12 +340,55 @@ export const MenuManager = () => {
               </Select>
             </div>
             <div>
-              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Price ($)</label>
+              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Price</label>
               <Input
                 type="number"
                 placeholder="24.99"
                 value={itemForm.price}
                 onChange={e => setItemForm({ ...itemForm, price: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Kitchen Station</label>
+              <Select value={itemForm.station} onChange={e => setItemForm({ ...itemForm, station: e.target.value })}>
+                <option value="General">General Station</option>
+                <option value="Main Course">Main Course</option>
+                <option value="Tandoor">Tandoor</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Snacks">Snacks</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Desserts">Desserts</option>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Happy Hour Price</label>
+              <Input
+                type="number"
+                placeholder="19.99"
+                value={itemForm.happyHourPrice}
+                onChange={e => setItemForm({ ...itemForm, happyHourPrice: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Happy Hour Start</label>
+              <Input
+                type="time"
+                value={itemForm.happyHourStart}
+                onChange={e => setItemForm({ ...itemForm, happyHourStart: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Happy Hour End</label>
+              <Input
+                type="time"
+                value={itemForm.happyHourEnd}
+                onChange={e => setItemForm({ ...itemForm, happyHourEnd: e.target.value })}
               />
             </div>
           </div>
@@ -333,13 +433,18 @@ export const MenuManager = () => {
               </div>
 
               {/* Upload file button */}
-              <label className="cursor-pointer flex items-center justify-center px-3 py-2 border border-dark-200 dark:border-dark-700 rounded-md bg-dark-50 dark:bg-dark-850 hover:bg-dark-100 dark:hover:bg-dark-800 transition-colors text-xs font-medium text-dark-700 dark:text-dark-300">
-                <Upload className="w-4 h-4 mr-1 text-brand-650" />
-                <span>Upload</span>
+              <label className={`cursor-pointer flex items-center justify-center px-3 py-2 border border-dark-200 dark:border-dark-700 rounded-md bg-dark-50 dark:bg-dark-850 hover:bg-dark-100 dark:hover:bg-dark-800 transition-colors text-xs font-medium text-dark-700 dark:text-dark-300 ${uploadingImage ? 'opacity-60 pointer-events-none' : ''}`}>
+                {uploadingImage ? (
+                  <Spinner size="sm" className="mr-1" />
+                ) : (
+                  <Upload className="w-4 h-4 mr-1 text-brand-650" />
+                )}
+                <span>{uploadingImage ? 'Uploading...' : 'Upload'}</span>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageFileUpload}
+                  disabled={uploadingImage}
                   className="hidden"
                 />
               </label>

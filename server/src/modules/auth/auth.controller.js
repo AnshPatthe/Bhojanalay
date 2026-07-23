@@ -87,11 +87,21 @@ export const verifyEmail = catchAsync(async (req, res) => {
 });
 
 export const forgotPassword = catchAsync(async (req, res) => {
-  const resetToken = await AuthService.forgotPassword(req.body.email);
+  const otp = await AuthService.forgotPassword(req.body.email);
   res.status(200).json({
     status: 'success',
-    message: 'Reset link generated. In production, an email would be sent.',
-    resetToken // Return for ease of development/testing
+    message: 'OTP sent to your email address.',
+    otp // Return for ease of development/testing
+  });
+});
+
+export const verifyOTP = catchAsync(async (req, res) => {
+  const { email, otp } = req.body;
+  const resetToken = await AuthService.verifyOTP(email, otp);
+  res.status(200).json({
+    status: 'success',
+    message: 'OTP verified successfully.',
+    resetToken
   });
 });
 

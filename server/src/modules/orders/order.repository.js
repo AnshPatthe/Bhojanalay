@@ -9,7 +9,7 @@ class OrderRepository extends BaseRepository {
 
   async findActiveByBranch(branchId) {
     return this.find(
-      { branchId, status: { $in: ['pending', 'preparing', 'ready'] } },
+      { branchId, status: { $in: ['pending', 'preparing', 'ready', 'billing'] } },
       'customerId employeeId',
       '',
       { createdAt: 1 }

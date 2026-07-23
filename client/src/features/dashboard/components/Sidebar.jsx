@@ -1,14 +1,15 @@
 import React from 'react';
-import { LayoutDashboard, ShoppingCart, BookOpen, Users, ClipboardList, LogOut, ChevronLeft, ChevronRight, Grid } from 'lucide-react';
+import { LayoutDashboard, ShoppingCart, BookOpen, Users, ClipboardList, LogOut, ChevronLeft, ChevronRight, Grid, ChefHat } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuthStore } from '@/store/useAuthStore';
 
-export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen }) => {
+export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen, pendingLeavesCount = 0 }) => {
   const { logout } = useAuthStore();
 
   const menuItems = [
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-5 w-5" /> },
     { id: 'orders', label: 'Live Orders', icon: <ShoppingCart className="h-5 w-5" /> },
+    { id: 'kds', label: 'Kitchen (KDS)', icon: <ChefHat className="h-5 w-5" /> },
     { id: 'menu', label: 'Menu Config', icon: <BookOpen className="h-5 w-5" /> },
     { id: 'tables', label: 'Tables', icon: <Grid className="h-5 w-5" /> },
     { id: 'staff', label: 'Staff Directory', icon: <Users className="h-5 w-5" /> },
@@ -40,7 +41,7 @@ export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
               key={item.id}
               onClick={() => handleItemClick(item.id)}
               className={cn(
-                "flex items-center space-x-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
+                "flex items-center space-x-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer relative",
                 isActive
                   ? "bg-brand-50 dark:bg-brand-950/40 text-brand-650 dark:text-brand-400"
                   : "text-dark-500 hover:bg-dark-50 dark:hover:bg-dark-800/50 hover:text-dark-900 dark:hover:text-white"
@@ -48,7 +49,20 @@ export const Sidebar = ({ activeTab, setActiveTab, isCollapsed, setIsCollapsed, 
             >
               {item.icon}
               {/* On mobile when open, always show label. On desktop respect collapse */}
-              {(isMobileOpen || !isCollapsed) && <span className="truncate">{item.label}</span>}
+              {(isMobileOpen || !isCollapsed) ? (
+                <div className="flex items-center justify-between w-full min-w-0">
+                  <span className="truncate">{item.label}</span>
+                  {item.id === 'staff' && pendingLeavesCount > 0 && (
+                    <span className="ml-2 bg-amber-500 text-white font-extrabold text-[10px] px-2 py-0.5 rounded-full animate-pulse flex-shrink-0">
+                      {pendingLeavesCount}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                item.id === 'staff' && pendingLeavesCount > 0 && (
+                  <div className="absolute top-1.5 right-1.5 h-2 w-2 bg-amber-500 rounded-full border border-white dark:border-dark-900 animate-pulse" />
+                )
+              )}
             </button>
           );
         })}

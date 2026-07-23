@@ -132,12 +132,6 @@ export const Login = () => {
             </Button>
           </form>
 
-          {loginType === 'owner' && (
-            <div className="text-center mt-6 text-xs text-dark-500 dark:text-dark-400">
-              Don't have an account?{' '}
-              <Link to="/register" className="text-brand-600 font-semibold hover:underline">Sign up for trial</Link>
-            </div>
-          )}
         </CardContent>
       </Card>
     </div>

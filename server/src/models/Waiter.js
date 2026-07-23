@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 
 const waiterSchema = new mongoose.Schema({
   restaurantId: {
@@ -36,6 +36,17 @@ const waiterSchema = new mongoose.Schema({
     type: String,
     enum: ['active', 'inactive', 'suspended'],
     default: 'active'
+  },
+  phone: {
+    type: String,
+    trim: true
+  },
+  dob: {
+    type: Date
+  },
+  profilePhoto: {
+    type: String,
+    default: ''
   }
 }, {
   timestamps: true

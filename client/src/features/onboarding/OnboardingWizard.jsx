@@ -92,7 +92,7 @@ export const OnboardingWizard = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Restaurant Type</label>
                       <Select {...register('restaurant.type')}>
@@ -163,7 +163,7 @@ export const OnboardingWizard = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div>
                       <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Country</label>
                       <Input
@@ -199,7 +199,7 @@ export const OnboardingWizard = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="text-sm font-medium text-dark-700 dark:text-dark-350 block mb-1">Branch Phone</label>
                       <Input

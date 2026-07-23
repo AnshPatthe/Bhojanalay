@@ -5,8 +5,14 @@ export const Toast = () => {
   return (
     <Toaster
       position="top-right"
+      containerStyle={{
+        top: 16,
+        right: 16,
+        bottom: 16,
+        left: 16,
+      }}
       toastOptions={{
-        className: 'border border-dark-200 dark:border-dark-800 bg-white dark:bg-dark-900 text-dark-900 dark:text-white rounded-lg shadow-xl',
+        className: 'border border-dark-200 dark:border-dark-800 bg-white dark:bg-dark-900 text-dark-900 dark:text-white rounded-lg shadow-xl max-w-sm w-full',
         duration: 3000,
         style: {
           padding: '12px 16px',
